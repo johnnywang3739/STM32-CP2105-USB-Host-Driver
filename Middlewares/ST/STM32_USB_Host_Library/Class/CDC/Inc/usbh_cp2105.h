@@ -11,7 +11,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 #include "usbh_core.h"
 
 #define USB_CP2105_CLASS                     0xFFU  // Vendor Specific
@@ -60,24 +59,25 @@ typedef struct {
   uint8_t OutPipe;
   uint8_t data_tx_state;
   uint8_t data_rx_state;
-  CP2105_LineCodingTypeDef LineCoding; // LineCoding for the port
 } CP2105_PortTypeDef;
 
 typedef struct {
   uint8_t state;
-  CP2105_PortTypeDef Port[2];
+  CP2105_LineCodingTypeDef LineCoding[2];
   CP2105_LineCodingTypeDef *pUserLineCoding;
-  uint8_t *pTxData;
-  uint8_t *pRxData;
-  uint32_t TxDataLength;
-  uint32_t RxDataLength;
+  uint8_t *pTxData[2];
+  uint8_t *pRxData[2];
+  uint32_t TxDataLength[2];
+  uint32_t RxDataLength[2];
+  CP2105_PortTypeDef Port[2];
 } CP2105_HandleTypeDef;
 
 extern USBH_ClassTypeDef CP2105_ClassDriver;
 
-void USBH_CP2105_LineCodingChanged(USBH_HandleTypeDef *phost);
-void USBH_CP2105_TransmitCallback(USBH_HandleTypeDef *phost);
-void USBH_CP2105_ReceiveCallback(USBH_HandleTypeDef *phost);
+USBH_StatusTypeDef USBH_CP2105_SetLineCoding(USBH_HandleTypeDef *phost, CP2105_LineCodingTypeDef *linecoding, uint8_t port);
+USBH_StatusTypeDef USBH_CP2105_GetLineCoding(USBH_HandleTypeDef *phost, CP2105_LineCodingTypeDef *linecoding, uint8_t port);
+USBH_StatusTypeDef USBH_CP2105_Transmit(USBH_HandleTypeDef *phost, uint8_t *pbuff, uint32_t length, uint8_t port);
+USBH_StatusTypeDef USBH_CP2105_Receive(USBH_HandleTypeDef *phost, uint8_t *pbuff, uint32_t length, uint8_t port);
 
 #ifdef __cplusplus
 }
