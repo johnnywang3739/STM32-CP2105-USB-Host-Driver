@@ -38,6 +38,8 @@ extern "C" {
 #define CP2105_SEND_DATA_WAIT                6U
 #define CP2105_RECEIVE_DATA                  7U
 #define CP2105_RECEIVE_DATA_WAIT             8U
+#define CP2105_GET_LINE_CODING_STATE_PORT1   9U
+#define CP2105_GET_LINE_CODING_STATE_PORT2   10U
 
 typedef struct {
   uint32_t dwDTERate;    // Data terminal rate in bits per second

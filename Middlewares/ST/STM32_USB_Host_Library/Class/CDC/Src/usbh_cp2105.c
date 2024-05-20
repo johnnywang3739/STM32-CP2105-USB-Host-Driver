@@ -29,7 +29,7 @@ USBH_StatusTypeDef USBH_CP2105_InterfaceInit(USBH_HandleTypeDef *phost) {
   USBH_StatusTypeDef status;
   uint8_t interface;
   CP2105_HandleTypeDef *CP2105_Handle;
-  
+
   interface = USBH_FindInterface(phost, CP2105_INTERFACE_CLASS_CODE, CP2105_INTERFACE_SUBCLASS_CODE, CP2105_INTERFACE_PROTOCOL_CODE);
 
   if ((interface == 0xFFU) || (interface >= USBH_MAX_NUM_INTERFACES)) {
@@ -155,27 +155,47 @@ USBH_StatusTypeDef USBH_CP2105_InterfaceDeInit(USBH_HandleTypeDef *phost) {
 //     return status;
 // }
 
-static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost)
-{
-  USBH_StatusTypeDef status = USBH_BUSY;
-  CP2105_HandleTypeDef *CP2105_Handle = (CP2105_HandleTypeDef *)phost->pActiveClass->pData;
+static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
+    USBH_StatusTypeDef status = USBH_BUSY;
+    CP2105_HandleTypeDef *CP2105_Handle = (CP2105_HandleTypeDef *)phost->pActiveClass->pData;
 
-  /* Issue the get line coding request */
-  status = GetLineCoding(phost, &CP2105_Handle->LineCoding, CP2105_ENH_PORT);
-  if (status == USBH_OK)
-  {
-    phost->pUser(phost, HOST_USER_CLASS_ACTIVE);
-  }
-  else if (status == USBH_NOT_SUPPORTED)
-  {
-    USBH_ErrLog("Control error: CDC: Device Get Line Coding configuration failed");
-  }
-  else
-  {
-    /* .. */
-  }
+    switch (CP2105_Handle->state) {
+        case CP2105_IDLE_STATE:
+            // Request line coding for the first port (Standard Port)
+            status = GetLineCoding(phost, &CP2105_Handle->LineCoding, CP2105_STD_PORT);
+            if (status == USBH_OK) {
+                CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT1;
+                status = USBH_BUSY; // Ensure to continue processing for the next port
+            } else if (status == USBH_NOT_SUPPORTED) {
+                USBH_ErrLog("Control error: CP2105: Device Get Line Coding configuration failed for Standard Port");
+                return USBH_FAIL;
+            }
+            break;
 
-  return status;
+        case CP2105_GET_LINE_CODING_STATE_PORT1:
+            // Request line coding for the second port (Enhanced Port)
+            status = GetLineCoding(phost, &CP2105_Handle->LineCoding, CP2105_ENH_PORT);
+            if (status == USBH_OK) {
+                CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT2;
+                status = USBH_BUSY; // Ensure to continue processing for the next state
+            } else if (status == USBH_NOT_SUPPORTED) {
+                USBH_ErrLog("Control error: CP2105: Device Get Line Coding configuration failed for Enhanced Port");
+                return USBH_FAIL;
+            }
+            break;
+
+        case CP2105_GET_LINE_CODING_STATE_PORT2:
+            // Both ports are configured, now notify the user
+            phost->pUser(phost, HOST_USER_CLASS_ACTIVE);
+            CP2105_Handle->state = CP2105_IDLE_STATE;
+            status = USBH_OK;
+            break;
+
+        default:
+            break;
+    }
+
+    return status;
 }
 
 // static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
