@@ -58,23 +58,26 @@ typedef struct {
   uint8_t NotifPipe;
   uint8_t InPipe;
   uint8_t OutPipe;
+  uint8_t data_tx_state;
+  uint8_t data_rx_state;
+  CP2105_LineCodingTypeDef LineCoding; // LineCoding for the port
 } CP2105_PortTypeDef;
 
 typedef struct {
   uint8_t state;
-  uint8_t data_tx_state;
-  uint8_t data_rx_state;
-  CP2105_LineCodingTypeDef LineCoding;
+  CP2105_PortTypeDef Port[2];
   CP2105_LineCodingTypeDef *pUserLineCoding;
   uint8_t *pTxData;
   uint8_t *pRxData;
   uint32_t TxDataLength;
   uint32_t RxDataLength;
-  CP2105_PortTypeDef Port[2];
 } CP2105_HandleTypeDef;
 
 extern USBH_ClassTypeDef CP2105_ClassDriver;
 
+void USBH_CP2105_LineCodingChanged(USBH_HandleTypeDef *phost);
+void USBH_CP2105_TransmitCallback(USBH_HandleTypeDef *phost);
+void USBH_CP2105_ReceiveCallback(USBH_HandleTypeDef *phost);
 
 #ifdef __cplusplus
 }
