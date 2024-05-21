@@ -29,6 +29,7 @@
 #include <stdarg.h>
 #include "usbh_core.h"
 #include "usbh_cdc.h"
+#include "usbh_cp2105.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,13 +52,17 @@
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
+
 char Uart_Buf[100];
 extern USBH_HandleTypeDef hUsbHostFS;
 extern ApplicationTypeDef Appli_state;
-CDC_HandleTypeDef *hcdc1;
-CDC_HandleTypeDef *hcdc2;
-//USBH_CDC_HandleTypeDef *hcdc1;
-//USBH_CDC_HandleTypeDef *hcdc2;
+
+uint8_t CP2105_State = CP2105_SET_LINE_CODING_STATE;
+uint32_t new_baud_rate = 9600; // Default baud rate
+
+const char hello_world[] = "Hello World";
+uint8_t message_to_send = 0;
+static uint8_t transmitting = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,8 +74,6 @@ void MX_USB_HOST_Process(void);
 /* USER CODE BEGIN PFP */
 const char* getAppliStateName(ApplicationTypeDef state);
 void print_application_state(ApplicationTypeDef state);
-void CDC_ReceiveData(CDC_HandleTypeDef *hcdc, int port_num);
-void CDC_SendData(CDC_HandleTypeDef *hcdc, const char *message);
 
 /* USER CODE END PFP */
 
@@ -109,17 +112,9 @@ void print_application_state(ApplicationTypeDef state) {
     HAL_UART_Transmit(&huart3, (uint8_t *)newline, sizeof(newline) - 1, 100);
 }
 
-void CDC_ReceiveData(CDC_HandleTypeDef *hcdc, int port_num) {
-    uint8_t buffer[64];
-    if (USBH_CDC_Receive(&hUsbHostFS, buffer, sizeof(buffer)) == USBH_OK) {
-        sprintf(Uart_Buf, "Port %d Received: %s\n", port_num, buffer);
-        HAL_UART_Transmit(&huart3, (uint8_t *)Uart_Buf, strlen(Uart_Buf), 100);
-    }
-}
 
-void CDC_SendData(CDC_HandleTypeDef *hcdc, const char *message) {
-    USBH_CDC_Transmit(&hUsbHostFS, (uint8_t *)message, strlen(message));
-}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -168,6 +163,8 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+
+
     switch (Appli_state) {
         case APPLICATION_START:
             HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET); // Turn on LD1
@@ -192,22 +189,17 @@ int main(void)
             break;
     }
 
-    /* Optional: Print application state */
-    print_application_state(Appli_state);
-
-//    HAL_Delay(1000);
-
-//    if (hcdc1 != NULL) {
-//        CDC_ReceiveData(hcdc1, 1);
-//        CDC_SendData(hcdc1, "Hello from COM Port 1\n");
-//    }
-//
-//    if (hcdc2 != NULL) {
-//        CDC_ReceiveData(hcdc2, 2);
-//        CDC_SendData(hcdc2, "Hello from COM Port 2\n");
-//    }
-
-//    printf("Application State: %s\n", getAppliStateName(Appli_state));
+    if (Appli_state == APPLICATION_READY) {
+          if (!transmitting) {
+              USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)hello_world, strlen(hello_world), CP2105_ENH_PORT);
+              if (result == USBH_OK) {
+                  transmitting = 1;
+                  USBH_UsrLog("Transmission started");
+              } else {
+                  USBH_UsrLog("Transmission failed: %d", result);
+              }
+          }
+      }
   }
   /* USER CODE END 3 */
 }
