@@ -60,7 +60,8 @@ extern ApplicationTypeDef Appli_state;
 uint8_t CP2105_State = CP2105_SET_LINE_CODING_STATE;
 uint32_t new_baud_rate = 9600; // Default baud rate
 
-const char hello_world[] = "Hello World";
+const char hello_world[] = "Hello World\r\n";
+
 uint8_t message_to_send = 0;
 static uint8_t transmitting = 0;
 /* USER CODE END PV */
@@ -105,7 +106,7 @@ void print_application_state(ApplicationTypeDef state) {
     // Create the main application state message
     sprintf(Uart_Buf, "Application State: %s\n", getAppliStateName(state));
     int len = strlen(Uart_Buf);
-    HAL_UART_Transmit(&huart3, (uint8_t *)Uart_Buf, len, 100);
+    HAL_UART_Transmit(&huart3, (uint8_t *)Uart_Buf, len, 1000);
 
     // Add an extra new line for separation between subsequent calls
     const char newline[] = "\r\n";
@@ -195,6 +196,8 @@ int main(void)
               if (result == USBH_OK) {
                   transmitting = 1;
                   USBH_UsrLog("Transmission started");
+                  HAL_Delay(100); // Wait for 100 ms
+                  transmitting = 0;
               } else {
                   USBH_UsrLog("Transmission failed: %d", result);
               }

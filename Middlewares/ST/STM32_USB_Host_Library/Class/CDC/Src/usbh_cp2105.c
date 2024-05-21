@@ -25,22 +25,8 @@ USBH_ClassTypeDef CP2105_ClassDriver = {
 };
 static USBH_StatusTypeDef USBH_CP2105_InterfaceInit(USBH_HandleTypeDef *phost) {
     USBH_StatusTypeDef status;
-    uint8_t interface;
+    uint8_t num_interfaces = phost->device.CfgDesc.bNumInterfaces;
     CP2105_HandleTypeDef *CP2105_Handle;
-
-    // Find the interface for CP2105
-    interface = USBH_FindInterface(phost, CP2105_INTERFACE_CLASS_CODE, CP2105_INTERFACE_SUBCLASS_CODE, CP2105_INTERFACE_PROTOCOL_CODE);
-
-    if ((interface == 0xFFU) || (interface >= USBH_MAX_NUM_INTERFACES)) {
-        USBH_DbgLog("Cannot Find the interface for CP2105 Interface Class.", phost->pActiveClass->Name);
-        return USBH_FAIL;
-    }
-
-    // Select the interface
-    status = USBH_SelectInterface(phost, interface);
-    if (status != USBH_OK) {
-        return USBH_FAIL;
-    }
 
     // Allocate memory for CP2105 Handle
     phost->pActiveClass->pData = (CP2105_HandleTypeDef *)USBH_malloc(sizeof(CP2105_HandleTypeDef));
@@ -53,32 +39,42 @@ static USBH_StatusTypeDef USBH_CP2105_InterfaceInit(USBH_HandleTypeDef *phost) {
 
     (void)USBH_memset(CP2105_Handle, 0, sizeof(CP2105_HandleTypeDef));
 
-    // Iterate through the endpoint descriptors and assign the sizes correctly
-    for (uint8_t i = 0; i < 2; i++) {
-        USBH_EpDescTypeDef *ep_desc = &phost->device.CfgDesc.Itf_Desc[interface].Ep_Desc[i];
+    // Iterate through all interfaces to find and initialize CP2105 interfaces
+    for (uint8_t interface = 0; interface < num_interfaces; interface++) {
+        if (phost->device.CfgDesc.Itf_Desc[interface].bInterfaceClass == CP2105_INTERFACE_CLASS_CODE &&
+            phost->device.CfgDesc.Itf_Desc[interface].bInterfaceSubClass == CP2105_INTERFACE_SUBCLASS_CODE &&
+            phost->device.CfgDesc.Itf_Desc[interface].bInterfaceProtocol == CP2105_INTERFACE_PROTOCOL_CODE) {
 
-        if ((ep_desc->bEndpointAddress & 0x80U) != 0U) {
-            // IN endpoint
-            CP2105_Handle->Port[i].InEp = ep_desc->bEndpointAddress;
-            CP2105_Handle->Port[i].InEpSize = ep_desc->wMaxPacketSize;
-            if (i == CP2105_STD_PORT) {
-                CP2105_Handle->Port[i].InEpSize = 32; // Correct for Standard Port
-            } else {
-                CP2105_Handle->Port[i].InEpSize = 64; // Correct for Enhanced Port
+            // Select the interface
+            status = USBH_SelectInterface(phost, interface);
+            if (status != USBH_OK) {
+                return USBH_FAIL;
             }
-            CP2105_Handle->Port[i].InPipe = USBH_AllocPipe(phost, ep_desc->bEndpointAddress);
-            (void)USBH_OpenPipe(phost, CP2105_Handle->Port[i].InPipe, CP2105_Handle->Port[i].InEp, phost->device.address, phost->device.speed, USB_EP_TYPE_BULK, CP2105_Handle->Port[i].InEpSize);
-        } else {
-            // OUT endpoint
-            CP2105_Handle->Port[i].OutEp = ep_desc->bEndpointAddress;
-            CP2105_Handle->Port[i].OutEpSize = ep_desc->wMaxPacketSize;
-            if (i == CP2105_STD_PORT) {
-                CP2105_Handle->Port[i].OutEpSize = 32; // Correct for Standard Port
-            } else {
-                CP2105_Handle->Port[i].OutEpSize = 64; // Correct for Enhanced Port
+
+            // Iterate through the endpoint descriptors and correct the sizes
+            for (uint8_t i = 0; i < phost->device.CfgDesc.Itf_Desc[interface].bNumEndpoints; i++) {
+                USBH_EpDescTypeDef *ep_desc = &phost->device.CfgDesc.Itf_Desc[interface].Ep_Desc[i];
+
+                if (interface == CP2105_STD_PORT) {
+                    ep_desc->wMaxPacketSize = 32;
+                } else {
+                    ep_desc->wMaxPacketSize = 64;
+                }
+
+                if ((ep_desc->bEndpointAddress & 0x80U) != 0U) {
+                    // IN endpoint
+                    CP2105_Handle->Port[interface].InEp = ep_desc->bEndpointAddress;
+                    CP2105_Handle->Port[interface].InEpSize = ep_desc->wMaxPacketSize;
+                    CP2105_Handle->Port[interface].InPipe = USBH_AllocPipe(phost, ep_desc->bEndpointAddress);
+                    (void)USBH_OpenPipe(phost, CP2105_Handle->Port[interface].InPipe, CP2105_Handle->Port[interface].InEp, phost->device.address, phost->device.speed, USB_EP_TYPE_BULK, CP2105_Handle->Port[interface].InEpSize);
+                } else {
+                    // OUT endpoint
+                    CP2105_Handle->Port[interface].OutEp = ep_desc->bEndpointAddress;
+                    CP2105_Handle->Port[interface].OutEpSize = ep_desc->wMaxPacketSize;
+                    CP2105_Handle->Port[interface].OutPipe = USBH_AllocPipe(phost, ep_desc->bEndpointAddress);
+                    (void)USBH_OpenPipe(phost, CP2105_Handle->Port[interface].OutPipe, CP2105_Handle->Port[interface].OutEp, phost->device.address, phost->device.speed, USB_EP_TYPE_BULK, CP2105_Handle->Port[interface].OutEpSize);
+                }
             }
-            CP2105_Handle->Port[i].OutPipe = USBH_AllocPipe(phost, ep_desc->bEndpointAddress);
-            (void)USBH_OpenPipe(phost, CP2105_Handle->Port[i].OutPipe, CP2105_Handle->Port[i].OutEp, phost->device.address, phost->device.speed, USB_EP_TYPE_BULK, CP2105_Handle->Port[i].OutEpSize);
         }
     }
 
@@ -86,8 +82,6 @@ static USBH_StatusTypeDef USBH_CP2105_InterfaceInit(USBH_HandleTypeDef *phost) {
 
     return USBH_OK;
 }
-
-
 
 
 static USBH_StatusTypeDef USBH_CP2105_InterfaceDeInit(USBH_HandleTypeDef *phost) {
@@ -120,6 +114,15 @@ static USBH_StatusTypeDef USBH_CP2105_InterfaceDeInit(USBH_HandleTypeDef *phost)
 
   return USBH_OK;
 }
+static USBH_StatusTypeDef USBH_CP2105_EnableInterface(USBH_HandleTypeDef *phost, uint8_t interface) {
+    phost->Control.setup.b.bmRequestType = 0x41; // Host to device, Class, Interface
+    phost->Control.setup.b.bRequest = 0x00; // IFC_ENABLE
+    phost->Control.setup.b.wValue.w = 0x0001; // Enable the interface
+    phost->Control.setup.b.wIndex.w = interface;
+    phost->Control.setup.b.wLength.w = 0;
+
+    return USBH_CtlReq(phost, NULL, 0);
+}
 
 static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
     USBH_StatusTypeDef status = USBH_BUSY;
@@ -127,6 +130,28 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
 
     switch (CP2105_Handle->state) {
         case CP2105_IDLE_STATE:
+            status = USBH_CP2105_EnableInterface(phost, CP2105_STD_PORT);
+            if (status == USBH_OK) {
+                CP2105_Handle->state = CP2105_ENABLE_INTERFACE_STATE_PORT1;
+                status = USBH_BUSY;
+            } else if (status != USBH_BUSY) {
+                USBH_ErrLog("Control error: CP2105: Device Enable Interface failed for Standard Port");
+                return USBH_FAIL;
+            }
+            break;
+
+        case CP2105_ENABLE_INTERFACE_STATE_PORT1:
+            status = USBH_CP2105_EnableInterface(phost, CP2105_ENH_PORT);
+            if (status == USBH_OK) {
+                CP2105_Handle->state = CP2105_ENABLE_INTERFACE_STATE_PORT2;
+                status = USBH_BUSY;
+            } else if (status != USBH_BUSY) {
+                USBH_ErrLog("Control error: CP2105: Device Enable Interface failed for Enhanced Port");
+                return USBH_FAIL;
+            }
+            break;
+
+        case CP2105_ENABLE_INTERFACE_STATE_PORT2:
             status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_STD_PORT], CP2105_STD_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT1;

@@ -38,6 +38,9 @@ extern "C" {
 #define CP2105_GET_LINE_CODING_STATE_PORT2   10U
 #define CP2105_GET_BAUD_RATE_STATE_PORT1     11U
 #define CP2105_GET_BAUD_RATE_STATE_PORT2     12U
+#define CP2105_ENABLE_INTERFACE_STATE_PORT1  13U  // Added for enabling Standard Port
+#define CP2105_ENABLE_INTERFACE_STATE_PORT2  14U  // Added for enabling Enhanced Port
+
 
 typedef struct {
   uint32_t dwDTERate;    // Data terminal rate in bits per second
