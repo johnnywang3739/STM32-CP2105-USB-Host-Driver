@@ -60,9 +60,10 @@ extern ApplicationTypeDef Appli_state;
 uint8_t CP2105_State = CP2105_SET_LINE_CODING_STATE;
 uint32_t new_baud_rate = 9600; // Default baud rate
 
-const char hello_world[] = "Hello World\r\n";
 
-uint8_t message_to_send = 0;
+#define RX_BUFFER_SIZE 32
+static uint8_t rx_buffer[RX_BUFFER_SIZE];
+static uint8_t receiving = 0;
 static uint8_t transmitting = 0;
 /* USER CODE END PV */
 
@@ -113,7 +114,16 @@ void print_application_state(ApplicationTypeDef state) {
     HAL_UART_Transmit(&huart3, (uint8_t *)newline, sizeof(newline) - 1, 100);
 }
 
+void process_received_data(uint8_t* data, uint32_t length) {
+    data[length] = '\0';  // Null-terminate the received data
 
+    sprintf(Uart_Buf, "Received data: %s", data);
+    int len = strlen(Uart_Buf);
+    HAL_UART_Transmit(&huart3, (uint8_t *)Uart_Buf, len, 1000);
+
+    const char newline[] = "\r\n";
+    HAL_UART_Transmit(&huart3, (uint8_t *)newline, sizeof(newline) - 1, 100);
+}
 
 
 /* USER CODE END 0 */
@@ -190,19 +200,57 @@ int main(void)
             break;
     }
 
-    if (Appli_state == APPLICATION_READY) {
-          if (!transmitting) {
-              USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)hello_world, strlen(hello_world), CP2105_ENH_PORT);
-              if (result == USBH_OK) {
-                  transmitting = 1;
-                  USBH_UsrLog("Transmission started");
-                  HAL_Delay(100); // Wait for 100 ms
-                  transmitting = 0;
-              } else {
-                  USBH_UsrLog("Transmission failed: %d", result);
-              }
-          }
-      }
+//    print_application_state(Appli_state);
+
+        if (Appli_state == APPLICATION_READY) {
+//            if (!transmitting) {
+//
+//            	char tx_buffer[] = "hello world 12345789\r\n";
+//                USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)tx_buffer, strlen(tx_buffer), CP2105_STD_PORT);
+//
+//                if (result == USBH_OK) {
+//                    transmitting = 1;
+//                    USBH_UsrLog("Transmission started");
+//                    HAL_Delay(100); // Wait for 100 ms
+//                    transmitting = 0;
+//                } else {
+//                    USBH_UsrLog("Transmission failed: %d", result);
+//                }
+//
+//            }
+
+            if (!receiving) {
+                USBH_StatusTypeDef result = USBH_CP2105_Receive(&hUsbHostFS, rx_buffer, RX_BUFFER_SIZE, CP2105_STD_PORT);
+                if (result == USBH_OK) {
+                    receiving = 1;
+                    USBH_UsrLog("Reception started");
+                } else {
+                    USBH_UsrLog("Reception failed: %d", result);
+                }
+            }
+
+            // Check if data has been received and process it
+            if (receiving) {
+                process_received_data(rx_buffer, RX_BUFFER_SIZE);
+                receiving = 0;  // Reset receiving flag
+
+            }
+        }
+    
+
+    // if (Appli_state == APPLICATION_READY) {
+    //       if (!transmitting) {
+    //           USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)tx_buffer, strlen(tx_buffer), CP2105_STD_PORT);
+    //           if (result == USBH_OK) {
+    //               transmitting = 1;
+    //               USBH_UsrLog("Transmission started");
+    //               HAL_Delay(100); // Wait for 100 ms
+    //               transmitting = 0;
+    //           } else {
+    //               USBH_UsrLog("Transmission failed: %d", result);
+    //           }
+    //       }
+    //   }
   }
   /* USER CODE END 3 */
 }
