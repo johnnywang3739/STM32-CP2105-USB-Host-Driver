@@ -57,14 +57,16 @@ char Uart_Buf[100];
 extern USBH_HandleTypeDef hUsbHostFS;
 extern ApplicationTypeDef Appli_state;
 
-uint8_t CP2105_State = CP2105_SET_LINE_CODING_STATE;
+#define RX_BUFFER_SIZE 32
+CP2105_StateTypeDef CP2105_State = CP2105_IDLE_STATE;
+
+static uint8_t rx_buffer[RX_BUFFER_SIZE];
+static uint8_t tx_buffer[] = "Hello World\r\n";
+static uint8_t transmitting = 0;
+static uint8_t receiving = 0;
+static uint8_t setBaudRateFlag = 1;
 uint32_t new_baud_rate = 9600; // Default baud rate
 
-
-#define RX_BUFFER_SIZE 32
-static uint8_t rx_buffer[RX_BUFFER_SIZE];
-static uint8_t receiving = 0;
-static uint8_t transmitting = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -124,6 +126,53 @@ void process_received_data(uint8_t* data, uint32_t length) {
     const char newline[] = "\r\n";
     HAL_UART_Transmit(&huart3, (uint8_t *)newline, sizeof(newline) - 1, 100);
 }
+void CP2105_Transmit(void) {
+    USBH_StatusTypeDef result;
+    switch (CP2105_State) {
+        case CP2105_IDLE_STATE:
+            if (new_baud_rate != 0) {
+                CP2105_State = CP2105_SET_BAUDRATE;
+            } else if (!transmitting) {
+                CP2105_State = CP2105_TRANSMIT_DATA;
+            }
+            break;
+
+        case CP2105_SET_BAUDRATE:
+            result = USBH_CP2105_SetBaudRate(&hUsbHostFS, new_baud_rate, CP2105_STD_PORT);
+            if (result == USBH_OK) {
+                USBH_UsrLog("Baud rate set to %lu", new_baud_rate);
+                new_baud_rate = 0;
+                CP2105_State = CP2105_IDLE_STATE;
+            } else if (result == USBH_BUSY) {
+                CP2105_State = CP2105_SET_BAUDRATE;
+            } else {
+                CP2105_State = CP2105_ERROR;
+                USBH_UsrLog("Failed to set baud rate: %d", result);
+            }
+            break;
+
+        case CP2105_TRANSMIT_DATA:
+            result = USBH_CP2105_Transmit(&hUsbHostFS, tx_buffer, strlen((char *)tx_buffer), CP2105_STD_PORT);
+            if (result == USBH_OK) {
+                transmitting = 0;
+                USBH_UsrLog("Transmission started");
+                CP2105_State = CP2105_IDLE_STATE;
+            } else {
+                USBH_UsrLog("Transmission failed: %d", result);
+                CP2105_State = CP2105_ERROR;
+            }
+            break;
+
+        case CP2105_ERROR:
+            USBH_UsrLog("Error occurred in CP2105 state machine");
+            CP2105_State = CP2105_IDLE_STATE;
+            break;
+
+        default:
+            break;
+    }
+}
+
 
 
 /* USER CODE END 0 */
@@ -202,55 +251,63 @@ int main(void)
 
 //    print_application_state(Appli_state);
 
-        if (Appli_state == APPLICATION_READY) {
-//            if (!transmitting) {
+//        if (Appli_state == APPLICATION_READY) {
+//        	CP2105_Transmit();
 //
-//            	char tx_buffer[] = "hello world 12345789\r\n";
-//                USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)tx_buffer, strlen(tx_buffer), CP2105_STD_PORT);
-//
-//                if (result == USBH_OK) {
-//                    transmitting = 1;
-//                    USBH_UsrLog("Transmission started");
-//                    HAL_Delay(100); // Wait for 100 ms
-//                    transmitting = 0;
-//                } else {
-//                    USBH_UsrLog("Transmission failed: %d", result);
-//                }
-//
-//            }
+//        }
 
-            if (!receiving) {
-                USBH_StatusTypeDef result = USBH_CP2105_Receive(&hUsbHostFS, rx_buffer, RX_BUFFER_SIZE, CP2105_STD_PORT);
-                if (result == USBH_OK) {
-                    receiving = 1;
-                    USBH_UsrLog("Reception started");
-                } else {
-                    USBH_UsrLog("Reception failed: %d", result);
-                }
+    uint8_t port_selected = CP2105_STD_PORT;
+
+    if (Appli_state == APPLICATION_READY) {
+
+    	if(setBaudRateFlag == 1){
+    		uint32_t new_baud_rate = 921600; // Default baud rate
+    		USBH_StatusTypeDef result = USBH_CP2105_SetBaudRate(&hUsbHostFS, new_baud_rate, port_selected);
+
+            if (result == USBH_OK) {
+                USBH_UsrLog("Baud rate set to %lu", new_baud_rate);
+                new_baud_rate = 0;
+                setBaudRateFlag = 0;
             }
+    	}
+//
 
-            // Check if data has been received and process it
-            if (receiving) {
-                process_received_data(rx_buffer, RX_BUFFER_SIZE);
-                receiving = 0;  // Reset receiving flag
+		if (!transmitting && setBaudRateFlag != 1) {
 
+			char tx_buffer[] = "Reading it from CP2105 Port \r\n";
+			USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)tx_buffer, strlen(tx_buffer), port_selected);
+
+			if (result == USBH_OK) {
+				transmitting = 1;
+				USBH_UsrLog("Transmission started");
+				HAL_Delay(100); // Wait for 100 ms
+				transmitting = 0;
+			} else {
+				USBH_UsrLog("Transmission failed: %d", result);
+			}
+
+		}
+
+        if (!receiving && setBaudRateFlag != 1) {
+            USBH_StatusTypeDef result = USBH_CP2105_Receive(&hUsbHostFS, rx_buffer, RX_BUFFER_SIZE, port_selected);
+            if (result == USBH_OK) {
+                receiving = 1;
+                USBH_UsrLog("Reception started");
+            } else {
+                USBH_UsrLog("Reception failed: %d", result);
             }
         }
+
+        // Check if data has been received and process it
+        if (receiving && setBaudRateFlag != 1) {
+            process_received_data(rx_buffer, RX_BUFFER_SIZE);
+            receiving = 0;  // Reset receiving flag
+
+        }
+
+    }
     
 
-    // if (Appli_state == APPLICATION_READY) {
-    //       if (!transmitting) {
-    //           USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)tx_buffer, strlen(tx_buffer), CP2105_STD_PORT);
-    //           if (result == USBH_OK) {
-    //               transmitting = 1;
-    //               USBH_UsrLog("Transmission started");
-    //               HAL_Delay(100); // Wait for 100 ms
-    //               transmitting = 0;
-    //           } else {
-    //               USBH_UsrLog("Transmission failed: %d", result);
-    //           }
-    //       }
-    //   }
   }
   /* USER CODE END 3 */
 }

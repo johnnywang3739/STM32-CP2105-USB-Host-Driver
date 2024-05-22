@@ -25,22 +25,27 @@ extern "C" {
 #define CP2105_ENH_PORT                      0U
 
 /* States */
-#define CP2105_IDLE_STATE                    0U
-#define CP2105_SET_LINE_CODING_STATE         1U
-#define CP2105_GET_LAST_LINE_CODING_STATE    2U
-#define CP2105_TRANSFER_DATA                 3U
-#define CP2105_ERROR_STATE                   4U
-#define CP2105_SEND_DATA                     5U
-#define CP2105_SEND_DATA_WAIT                6U
-#define CP2105_RECEIVE_DATA                  7U
-#define CP2105_RECEIVE_DATA_WAIT             8U
-#define CP2105_GET_LINE_CODING_STATE_PORT1   9U
-#define CP2105_GET_LINE_CODING_STATE_PORT2   10U
-#define CP2105_GET_BAUD_RATE_STATE_PORT1     11U
-#define CP2105_GET_BAUD_RATE_STATE_PORT2     12U
-#define CP2105_ENABLE_INTERFACE_STATE_PORT1  13U  // Added for enabling Standard Port
-#define CP2105_ENABLE_INTERFACE_STATE_PORT2  14U  // Added for enabling Enhanced Port
-
+typedef enum {
+    CP2105_IDLE_STATE = 0,
+    CP2105_SET_LINE_CODING_STATE,
+    CP2105_GET_LAST_LINE_CODING_STATE,
+    CP2105_TRANSFER_DATA,
+    CP2105_ERROR_STATE,
+    CP2105_SEND_DATA,
+    CP2105_SEND_DATA_WAIT,
+    CP2105_RECEIVE_DATA,
+    CP2105_RECEIVE_DATA_WAIT,
+    CP2105_GET_LINE_CODING_STATE_PORT1,
+    CP2105_GET_LINE_CODING_STATE_PORT2,
+    CP2105_GET_BAUD_RATE_STATE_PORT1,
+    CP2105_GET_BAUD_RATE_STATE_PORT2,
+    CP2105_ENABLE_INTERFACE_STATE_PORT1,
+    CP2105_ENABLE_INTERFACE_STATE_PORT2,
+    CP2105_SET_BAUDRATE,
+    CP2105_TRANSMIT_DATA,
+    CP2105_PROCESS_DATA,
+    CP2105_ERROR
+} CP2105_StateTypeDef;
 
 typedef struct {
   uint32_t dwDTERate;    // Data terminal rate in bits per second
@@ -66,7 +71,7 @@ typedef struct {
 typedef struct {
   uint8_t state;
   CP2105_LineCodingTypeDef LineCoding[2];
-  uint32_t BaudRate[2];  // Added array to store baud rates for each port
+  uint32_t BaudRate[2];  
   CP2105_LineCodingTypeDef *pUserLineCoding;
   uint8_t *pTxData[2];
   uint8_t *pRxData[2];
@@ -77,12 +82,17 @@ typedef struct {
 
 extern USBH_ClassTypeDef CP2105_ClassDriver;
 
-//USBH_StatusTypeDef USBH_CP2105_SetBaudRate(USBH_HandleTypeDef *phost, uint32_t baudRate, uint8_t port);
-//USBH_StatusTypeDef USBH_CP2105_GetBaudRate(USBH_HandleTypeDef *phost, uint32_t *baudRate, uint8_t port);
+USBH_StatusTypeDef USBH_CP2105_SetBaudRate(USBH_HandleTypeDef *phost, uint32_t baudRate, uint8_t port);
+USBH_StatusTypeDef USBH_CP2105_GetBaudRate(USBH_HandleTypeDef *phost, uint32_t *baudRate, uint8_t port);
 USBH_StatusTypeDef USBH_CP2105_SetLineCoding(USBH_HandleTypeDef *phost, CP2105_LineCodingTypeDef *linecoding, uint8_t port);
 USBH_StatusTypeDef USBH_CP2105_GetLineCoding(USBH_HandleTypeDef *phost, CP2105_LineCodingTypeDef *linecoding, uint8_t port);
 USBH_StatusTypeDef USBH_CP2105_Transmit(USBH_HandleTypeDef *phost, uint8_t *pbuff, uint32_t length, uint8_t port);
 USBH_StatusTypeDef USBH_CP2105_Receive(USBH_HandleTypeDef *phost, uint8_t *pbuff, uint32_t length, uint8_t port);
+USBH_StatusTypeDef USBH_CP2105_SetBaudRate(USBH_HandleTypeDef *phost, uint32_t baudRate, uint8_t port);
+void USBH_CP2105_TransmitCallback(USBH_HandleTypeDef *phost, uint8_t port);
+void USBH_CP2105_ReceiveCallback(USBH_HandleTypeDef *phost, uint8_t port);
+void USBH_CP2105_LineCodingChanged(USBH_HandleTypeDef *phost, uint8_t port);
+
 
 
 #ifdef __cplusplus
