@@ -27,6 +27,7 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "usbh_core.h"
 
+
 /** @addtogroup USBH_LIB
   * @{
   */

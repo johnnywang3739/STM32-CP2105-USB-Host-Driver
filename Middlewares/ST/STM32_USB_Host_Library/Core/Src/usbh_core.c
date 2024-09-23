@@ -20,10 +20,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usbh_core.h"
 
-//#include "usart.h"
-#include <stdio.h>
-#include <stdarg.h>
-
 
 /** @addtogroup USBH_LIB
   * @{
@@ -647,8 +643,7 @@ USBH_StatusTypeDef USBH_Process(USBH_HandleTypeDef *phost)
 
     case HOST_SET_CONFIGURATION:
       /* set configuration */
-      USBH_StatusTypeDef status = USBH_SetCfg(phost, (uint16_t)phost->device.CfgDesc.bConfigurationValue);
-      if (status == USBH_OK)
+      if (USBH_SetCfg(phost, (uint16_t)phost->device.CfgDesc.bConfigurationValue) == USBH_OK)
       {
         phost->gState = HOST_SET_WAKEUP_FEATURE;
         USBH_UsrLog("Default configuration set.");
@@ -672,8 +667,7 @@ USBH_StatusTypeDef USBH_Process(USBH_HandleTypeDef *phost)
 
         if (status == USBH_OK)
         {
-//          USBH_UsrLog("Device remote wakeup enabled");
-
+          USBH_UsrLog("Device remote wakeup enabled");
           phost->gState = HOST_CHECK_CLASS;
         }
         else if (status == USBH_NOT_SUPPORTED)
@@ -710,7 +704,6 @@ USBH_StatusTypeDef USBH_Process(USBH_HandleTypeDef *phost)
       else
       {
         phost->pActiveClass = NULL;
-
 
         for (idx = 0U; idx < USBH_MAX_NUM_SUPPORTED_CLASS; idx++)
         {
@@ -759,7 +752,7 @@ USBH_StatusTypeDef USBH_Process(USBH_HandleTypeDef *phost)
       if (phost->pActiveClass != NULL)
       {
         status = phost->pActiveClass->Requests(phost);
-    	  // UART_Printf("Device Interface Class: %xh", phost->device.CfgDesc.Itf_Desc[0].bInterfaceClass);
+
         if (status == USBH_OK)
         {
           phost->gState = HOST_CLASS;
@@ -839,10 +832,6 @@ USBH_StatusTypeDef USBH_Process(USBH_HandleTypeDef *phost)
       break;
 
     case HOST_ABORT_STATE:
-        HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);   // Ensure LD1 is off
-        HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);   // Ensure LD2 is off
-        HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET); // Turn on LD3
-        while(1);
     default :
       break;
   }
@@ -864,8 +853,6 @@ static USBH_StatusTypeDef USBH_HandleEnum(USBH_HandleTypeDef *phost)
   switch (phost->EnumState)
   {
     case ENUM_IDLE:
-
-//      USBH_Delay(500U);// add aditional delay
       /* Get Device Desc for only 1st 8 bytes : To get EP0 MaxPacketSize */
       ReqStatus = USBH_Get_DevDesc(phost, 8U);
       if (ReqStatus == USBH_OK)

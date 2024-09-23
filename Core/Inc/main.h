@@ -59,14 +59,22 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define Button_Pin GPIO_PIN_13
 #define Button_GPIO_Port GPIOC
+#define Debug_LD_Green_Pin GPIO_PIN_5
+#define Debug_LD_Green_GPIO_Port GPIOA
 #define LD1_Pin GPIO_PIN_0
 #define LD1_GPIO_Port GPIOB
+#define Debug_LD_Main_Pin GPIO_PIN_13
+#define Debug_LD_Main_GPIO_Port GPIOF
 #define LD3_Pin GPIO_PIN_14
 #define LD3_GPIO_Port GPIOB
 #define VBUS_Pin GPIO_PIN_6
 #define VBUS_GPIO_Port GPIOG
 #define LD2_Pin GPIO_PIN_7
 #define LD2_GPIO_Port GPIOB
+#define Debug_LD_Blue_Pin GPIO_PIN_8
+#define Debug_LD_Blue_GPIO_Port GPIOB
+#define Debug_LD_Red_Pin GPIO_PIN_9
+#define Debug_LD_Red_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

@@ -1091,7 +1091,7 @@ HCD_StateTypeDef HAL_HCD_GetState(HCD_HandleTypeDef *hhcd)
   *            URB_DONE/
   *            URB_NOTREADY/
   *            URB_NYET/
-  *            URB_ERROR/s
+  *            URB_ERROR/
   *            URB_STALL
   */
 HCD_URBStateTypeDef HAL_HCD_HC_GetURBState(HCD_HandleTypeDef *hhcd, uint8_t chnum)

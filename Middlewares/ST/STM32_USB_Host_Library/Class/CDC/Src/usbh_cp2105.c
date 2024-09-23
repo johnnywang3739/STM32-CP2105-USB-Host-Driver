@@ -144,62 +144,65 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
             status = USBH_CP2105_EnableInterface(phost, CP2105_ECI_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_ENABLE_INTERFACE_STATE_PORT2;
-                status = USBH_BUSY;
+//                status = USBH_BUSY;
+				CP2105_Handle->state = CP2105_IDLE_STATE;
+				status = USBH_OK;
+                phost->pUser(phost, HOST_USER_CLASS_ACTIVE);
             } else if (status != USBH_BUSY) {
                 USBH_ErrLog("Control error: CP2105: Device Enable Interface failed for Enhanced Port");
                 return USBH_FAIL;
             }
             break;
 
-        case CP2105_ENABLE_INTERFACE_STATE_PORT2:
-            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_SCI_PORT], CP2105_SCI_PORT);
-            if (status == USBH_OK) {
-                CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT1;
-                status = USBH_BUSY;
-            } else if (status == USBH_NOT_SUPPORTED) {
-                USBH_ErrLog("Control error: CP2105: Device Get Line Coding configuration failed for Standard Port");
-                return USBH_FAIL;
-            }
-            break;
-
-        case CP2105_GET_LINE_CODING_STATE_PORT1:
-            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_ECI_PORT], CP2105_ECI_PORT);
-            if (status == USBH_OK) {
-                CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT2;
-                status = USBH_BUSY;
-            } else if (status == USBH_NOT_SUPPORTED) {
-                USBH_ErrLog("Control error: CP2105: Device Get Line Coding configuration failed for Enhanced Port");
-                return USBH_FAIL;
-            }
-            break;
-
-        case CP2105_GET_LINE_CODING_STATE_PORT2:
-            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_SCI_PORT], CP2105_SCI_PORT);
-            if (status == USBH_OK) {
-                CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT1;
-                status = USBH_BUSY;
-            } else if (status == USBH_NOT_SUPPORTED) {
-                USBH_ErrLog("Control error: CP2105: Device Get Baud Rate configuration failed for Standard Port");
-                return USBH_FAIL;
-            }
-            break;
-
-        case CP2105_GET_BAUD_RATE_STATE_PORT1:
-            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_ECI_PORT], CP2105_ECI_PORT);
-            if (status == USBH_OK) {
-                CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT2;
-                status = USBH_BUSY;
-            } else if (status == USBH_NOT_SUPPORTED) {
-                USBH_ErrLog("Control error: CP2105: Device Get Baud Rate configuration failed for Enhanced Port");
-                return USBH_FAIL;
-            }
-            break;
-
-        case CP2105_GET_BAUD_RATE_STATE_PORT2:
-            phost->pUser(phost, HOST_USER_CLASS_ACTIVE);
-            CP2105_Handle->state = CP2105_IDLE_STATE;
-            status = USBH_OK;
-            break;
+//        case CP2105_ENABLE_INTERFACE_STATE_PORT2:
+//            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_SCI_PORT], CP2105_SCI_PORT);
+//            if (status == USBH_OK) {
+//                CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT1;
+//                status = USBH_BUSY;
+//            } else if (status == USBH_NOT_SUPPORTED) {
+//                USBH_ErrLog("Control error: CP2105: Device Get Line Coding configuration failed for Standard Port");
+//                return USBH_FAIL;
+//            }
+//            break;
+//
+//        case CP2105_GET_LINE_CODING_STATE_PORT1:
+//            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_ECI_PORT], CP2105_ECI_PORT);
+//            if (status == USBH_OK) {
+//                CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT2;
+//                status = USBH_BUSY;
+//            } else if (status == USBH_NOT_SUPPORTED) {
+//                USBH_ErrLog("Control error: CP2105: Device Get Line Coding configuration failed for Enhanced Port");
+//                return USBH_FAIL;
+//            }
+//            break;
+//
+//        case CP2105_GET_LINE_CODING_STATE_PORT2:
+//            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_SCI_PORT], CP2105_SCI_PORT);
+//            if (status == USBH_OK) {
+//                CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT1;
+//                status = USBH_BUSY;
+//            } else if (status == USBH_NOT_SUPPORTED) {
+//                USBH_ErrLog("Control error: CP2105: Device Get Baud Rate configuration failed for Standard Port");
+//                return USBH_FAIL;
+//            }
+//            break;
+//
+//        case CP2105_GET_BAUD_RATE_STATE_PORT1:
+//            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_ECI_PORT], CP2105_ECI_PORT);
+//            if (status == USBH_OK) {
+//                CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT2;
+//                status = USBH_BUSY;
+//            } else if (status == USBH_NOT_SUPPORTED) {
+//                USBH_ErrLog("Control error: CP2105: Device Get Baud Rate configuration failed for Enhanced Port");
+//                return USBH_FAIL;
+//            }
+//            break;
+//
+//        case CP2105_GET_BAUD_RATE_STATE_PORT2:
+//            phost->pUser(phost, HOST_USER_CLASS_ACTIVE);
+//            CP2105_Handle->state = CP2105_IDLE_STATE;
+//            status = USBH_OK;
+//            break;
 
         default:
             break;

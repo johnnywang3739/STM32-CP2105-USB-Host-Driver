@@ -76,15 +76,15 @@ void MX_USB_HOST_Init(void)
   {
     Error_Handler();
   }
-//  if (USBH_RegisterClass(&hUsbHostFS, USBH_CDC_CLASS) != USBH_OK)
-//  {
-//    Error_Handler();
-//  }
-//  USBH_RegisterClass(&hUsbHostFS, &CP2105_ClassDriver);
-	if (USBH_RegisterClass(&hUsbHostFS, &CP2105_ClassDriver) != USBH_OK)
-	{
-	  Error_Handler();
-	}
+  //  if (USBH_RegisterClass(&hUsbHostFS, USBH_CDC_CLASS) != USBH_OK)
+  //  {
+  //    Error_Handler();
+  //  }
+  //  USBH_RegisterClass(&hUsbHostFS, &CP2105_ClassDriver);
+  	if (USBH_RegisterClass(&hUsbHostFS, &CP2105_ClassDriver) != USBH_OK)
+  	{
+  	  Error_Handler();
+  	}
 
   if (USBH_Start(&hUsbHostFS) != USBH_OK)
   {
@@ -95,14 +95,6 @@ void MX_USB_HOST_Init(void)
   /* USER CODE END USB_HOST_Init_PostTreatment */
 }
 
-/*
- * Background task
- */
-void MX_USB_HOST_Process(void)
-{
-  /* USB Host Background task */
-  USBH_Process(&hUsbHostFS);
-}
 /*
  * user callback definition
  */

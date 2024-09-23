@@ -17,9 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#define USBH_UsrLog(...) UART_Printf(__VA_ARGS__)
-#define USBH_ErrLog(...) UART_Printf(__VA_ARGS__)
 #include "main.h"
+#include "cmsis_os.h"
 #include "usb_host.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -30,6 +29,8 @@
 #include "usbh_core.h"
 #include "usbh_cdc.h"
 #include "usbh_cp2105.h"
+#include "FreeRTOS.h"
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,6 +52,9 @@
 
 UART_HandleTypeDef huart3;
 
+osThreadId USBProcessTaskHandle;
+osThreadId TransmitTaskHandle;
+osThreadId ReceiveTaskHandle;
 /* USER CODE BEGIN PV */
 
 char Uart_Buf[100];
@@ -61,8 +65,9 @@ extern ApplicationTypeDef Appli_state;
 CP2105_StateTypeDef CP2105_State = CP2105_IDLE_STATE;
 
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
+static uint8_t tx_buffer[] = "Hello World\r\n";
 static uint8_t transmitting = 0;
-static uint8_t receiving = 0;  // flag
+static uint8_t receiving = 0;
 static uint8_t setBaudRateFlag = 1;
 uint32_t new_baud_rate = 9600; // Default baud rate
 
@@ -72,7 +77,9 @@ uint32_t new_baud_rate = 9600; // Default baud rate
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
-void MX_USB_HOST_Process(void);
+void StartUSBProcessTask(void const * argument);
+void StartTransmitTask(void const * argument);
+void StartReceiveTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 const char* getAppliStateName(ApplicationTypeDef state);
@@ -125,9 +132,7 @@ void process_received_data(uint8_t* data, uint32_t length) {
     const char newline[] = "\r\n";
     HAL_UART_Transmit(&huart3, (uint8_t *)newline, sizeof(newline) - 1, 100);
 }
-
-
-
+osMutexId usbMutexHandle;
 
 /* USER CODE END 0 */
 
@@ -161,109 +166,62 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
-  MX_USB_HOST_Init();
   /* USER CODE BEGIN 2 */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET); //
   HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET); //
   HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET); //
-
-//  CP2105_HandleTypeDef *handle = (CP2105_HandleTypeDef *)hUsbHostFS.pActiveClass->pData;
   /* USER CODE END 2 */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of USBProcessTask */
+  /* USB Process Task - Highest Priority */
+  osThreadDef(USBProcessTask, StartUSBProcessTask, osPriorityRealtime, 0, 512);
+  USBProcessTaskHandle = osThreadCreate(osThread(USBProcessTask), NULL);
+
+  /* Receive Task - High Priority */
+  osThreadDef(ReceiveTask, StartReceiveTask, osPriorityHigh, 0, 512);
+  ReceiveTaskHandle = osThreadCreate(osThread(ReceiveTask), NULL);
+
+  /* Transmit Task - Normal Priority */
+  osThreadDef(TransmitTask, StartTransmitTask, osPriorityNormal, 0, 512);
+  TransmitTaskHandle = osThreadCreate(osThread(TransmitTask), NULL);
+
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  osMutexDef(usbMutex);
+  usbMutexHandle = osMutexCreate(osMutex(usbMutex));
+
+  /* USER CODE END RTOS_THREADS */
+  HAL_GPIO_WritePin(GPIOF, Debug_LD_Main_Pin, GPIO_PIN_SET);
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-    MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
-
-    switch (Appli_state) {
-        case APPLICATION_START:
-            HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET); // Turn on LD1
-            HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);   // Ensure LD2 is off
-            HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);   // Ensure LD3 is off
-            break;
-        case APPLICATION_READY:
-            HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);   // Ensure LD1 is off
-            HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET); // Turn on LD2
-            HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);   // Ensure LD3 is off
-            break;
-        case APPLICATION_DISCONNECT:
-            HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);   // Ensure LD1 is off
-            HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);   // Ensure LD2 is off
-            HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET); // Turn on LD3
-            break;
-        default:
-            // Turn all LEDs off if the state is not one of the above
-            HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
-            break;
-    }
-
-//    print_application_state(Appli_state);
-
-//        if (Appli_state == APPLICATION_READY) {
-//        	CP2105_Transmit();
-//
-//        }
-
-
-//    uint8_t port_selected = CP2105_ECI_PORT;
-    uint8_t port_selected = CP2105_SCI_PORT;
-    if (Appli_state == APPLICATION_READY) {
-
-    	if(setBaudRateFlag == 1){
-    		uint32_t new_baud_rate = 115200; // Default baud rate
-    		USBH_StatusTypeDef result = USBH_CP2105_SetBaudRate(&hUsbHostFS, new_baud_rate, port_selected);
-
-            if (result == USBH_OK) {
-                USBH_UsrLog("Baud rate set to %lu", new_baud_rate);
-                new_baud_rate = 0;
-                setBaudRateFlag = 0;
-            }
-    	}
-//
-
-		if (!transmitting && setBaudRateFlag != 1) {
-
-//			char tx_buffer[BUFFER_SIZE];
-			char tx_buffer[] = "Reading it from CP2105 Port \r\n";
-			USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, (uint8_t*)tx_buffer, strlen(tx_buffer), port_selected);
-
-			if (result == USBH_OK) {
-				transmitting = 1;
-				USBH_UsrLog("Transmission started");
-				HAL_Delay(100); // Wait for 100 ms
-				transmitting = 0;
-			} else {
-				USBH_UsrLog("Transmission failed: %d", result);
-			}
-
-		}
-
-        if (!receiving && setBaudRateFlag != 1) {
-            USBH_StatusTypeDef result = USBH_CP2105_Receive(&hUsbHostFS, rx_buffer, RX_BUFFER_SIZE, port_selected);
-            if (result == USBH_OK) {
-                receiving = 1;
-                USBH_UsrLog("Reception started");
-            } else {
-                USBH_UsrLog("Reception failed: %d", result);
-            }
-        }
-
-        // Check if data has been received and process it
-        if (receiving && setBaudRateFlag != 1) {
-            process_received_data(rx_buffer, RX_BUFFER_SIZE);
-            receiving = 0;  // Reset receiving flag
-
-        }
-
-    }
-
-    
 
 
   }
@@ -339,7 +297,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 9600;
+  huart3.Init.BaudRate = 115200;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -372,13 +330,21 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|GPIO_PIN_5|LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(Debug_LD_Green_GPIO_Port, Debug_LD_Green_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|GPIO_PIN_5|LD2_Pin
+                          |Debug_LD_Blue_Pin|Debug_LD_Red_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(Debug_LD_Main_GPIO_Port, Debug_LD_Main_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(VBUS_GPIO_Port, VBUS_Pin, GPIO_PIN_RESET);
@@ -389,12 +355,28 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD1_Pin LD3_Pin PB5 LD2_Pin */
-  GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|GPIO_PIN_5|LD2_Pin;
+  /*Configure GPIO pin : Debug_LD_Green_Pin */
+  GPIO_InitStruct.Pin = Debug_LD_Green_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(Debug_LD_Green_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LD1_Pin LD3_Pin PB5 LD2_Pin
+                           Debug_LD_Blue_Pin Debug_LD_Red_Pin */
+  GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|GPIO_PIN_5|LD2_Pin
+                          |Debug_LD_Blue_Pin|Debug_LD_Red_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Debug_LD_Main_Pin */
+  GPIO_InitStruct.Pin = Debug_LD_Main_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(Debug_LD_Main_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : VBUS_Pin */
   GPIO_InitStruct.Pin = VBUS_Pin;
@@ -411,6 +393,146 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
+/* USER CODE BEGIN Header_StartUSBProcessTask */
+/**
+  * @brief  Function implementing the USBProcessTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartUSBProcessTask */
+void StartUSBProcessTask(void const * argument)
+{
+  /* init code for USB_HOST */
+  MX_USB_HOST_Init();
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    if (osMutexWait(usbMutexHandle, 1000) == osOK) {  // Wait for 1000 ticks (1 second)
+      HAL_GPIO_WritePin(GPIOB, Debug_LD_Blue_Pin, GPIO_PIN_SET);
+      USBH_Process(&hUsbHostFS);
+
+      switch (Appli_state) {
+        case APPLICATION_START:
+          HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_SET); // Turn on LD1
+          HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);   // Ensure LD2 is off
+          HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);   // Ensure LD3 is off
+          break;
+        case APPLICATION_READY:
+          HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);   // Ensure LD1 is off
+          HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET); // Turn on LD2
+          HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);   // Ensure LD3 is off
+
+          uint8_t port_selected = CP2105_SCI_PORT;
+          CP2105_HandleTypeDef *handle = (CP2105_HandleTypeDef *)hUsbHostFS.pActiveClass->pData;
+          if (handle->data_received_flag[port_selected]) {
+            process_received_data(rx_buffer, RX_BUFFER_SIZE);
+//            osDelay(50);
+            handle->data_received_flag[port_selected] = 0; // Reset the flag
+          }
+
+          break;
+        case APPLICATION_DISCONNECT:
+          HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);   // Ensure LD1 is off
+          HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);   // Ensure LD2 is off
+          HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET); // Turn on LD3
+          break;
+        default:
+          HAL_GPIO_WritePin(GPIOB, LD1_Pin, GPIO_PIN_RESET);
+          HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
+          HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_RESET);
+          break;
+      }
+      HAL_GPIO_WritePin(GPIOB, Debug_LD_Blue_Pin, GPIO_PIN_RESET);
+
+      osMutexRelease(usbMutexHandle);
+    }
+
+    osDelay(1);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTransmitTask */
+/**
+* @brief Function implementing the TransmitTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTransmitTask */
+void StartTransmitTask(void const * argument)
+{
+  /* USER CODE BEGIN StartTransmitTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    HAL_GPIO_WritePin(GPIOB, Debug_LD_Red_Pin, GPIO_PIN_SET);
+    if (Appli_state == APPLICATION_READY) {
+      if (osMutexWait(usbMutexHandle, 1000) == osOK) {  // Wait for 1000 ticks (1 second)
+        uint8_t port_selected = CP2105_SCI_PORT;
+        USBH_StatusTypeDef result = USBH_CP2105_Transmit(&hUsbHostFS, tx_buffer, strlen((char*)tx_buffer), port_selected);
+        osMutexRelease(usbMutexHandle);
+      } else {
+        UART_Printf("StartTransmitTask: Failed to acquire mutex within timeout");
+//        osDelay(1000);
+      }
+    }
+    HAL_GPIO_WritePin(GPIOB, Debug_LD_Red_Pin, GPIO_PIN_RESET);
+    osDelay(1000);
+  }
+  /* USER CODE END StartTransmitTask */
+}
+
+/* USER CODE BEGIN Header_StartReceiveTask */
+/**
+* @brief Function implementing the ReceiveTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartReceiveTask */
+void StartReceiveTask(void const * argument)
+{
+  /* USER CODE BEGIN StartReceiveTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    HAL_GPIO_WritePin(GPIOA, Debug_LD_Green_Pin, GPIO_PIN_SET);
+    if (Appli_state == APPLICATION_READY) {
+      if (osMutexWait(usbMutexHandle, 1000) == osOK) {  // Wait for 1000 ticks (1 second)
+        uint8_t port_selected = CP2105_SCI_PORT;
+        USBH_StatusTypeDef result = USBH_CP2105_Receive(&hUsbHostFS, rx_buffer, RX_BUFFER_SIZE, port_selected);
+        osMutexRelease(usbMutexHandle);
+      } else {
+        UART_Printf("StartReceiveTask: Failed to acquire mutex within timeout");
+      }
+    }
+    HAL_GPIO_WritePin(GPIOA, Debug_LD_Green_Pin, GPIO_PIN_RESET);
+    osDelay(1);
+  }
+  /* USER CODE END StartReceiveTask */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
+
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
@@ -425,6 +547,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
+
 
 #ifdef  USE_FULL_ASSERT
 /**
