@@ -1,8 +1,8 @@
 # CP2105 USB Host Driver for STM32
 
-This repository contains the USB Host driver implementation for STM32 to communicate with the Silicon Labs CP2105, a dual USB-to-UART bridge device. This driver is specifically developed to replace the standard STM32 USB CDC class, which does not support vendor-specific devices such as CP2105.
+This repository contains the USB Host driver implementation for STM32 to communicate with the Silicon Labs CP2105, a dual USB-to-UART bridge device. This driver is specifically developed to replace the standard STM32 USB CDC class, which does not support vendor-specific devices like CP2105.
 
-## Introduction
+## Overview
 
 CP2105 is a composite USB device that provides dual UART interfaces. The STM32 CDC class does not natively support this, so a custom driver was developed to handle the CP2105's unique control requests and data communication. The driver provides the ability to set baud rates, transmit, and receive data on both UART ports of the CP2105.
 
@@ -12,10 +12,41 @@ CP2105 is a composite USB device that provides dual UART interfaces. The STM32 C
   - **Enhanced Port (ECI Port)**: Supports baud rates from 300 bps to 2.0 Mbps.
 - Implements baud rate configuration for both UART channels, allowing flexible control over communication speeds.
 - Supports data transmission and reception via USB bulk transfer.
-- Provides user callbacks for data transmission and reception completion.
+
+## Hardware Setup
+
+This section describes how the STM32 and CP2105 dev board are connected. The following photo shows the physical connection:
+
+<p align="center">
+  <img src="./USB_connection.jpg" alt="USB Connection" width="400"/>
+</p>
 
 
-## Installation
+### Connection Details
+
+1. **STM32 as USB Host**: 
+   - The STM32 is configured as a USB host and is connected to the CP2105 development board via the USB port.
+   - The STM32 is powered by a PC through ST-Link, which also allows it to send debugging messages to the PC using USART3.
+   
+2. **CP2105 as USB-to-UART Bridge**:
+   - CP2105’s UART ports (SCI and ECI) are connected to a PC using an FTDI chip, which acts as a UART-to-USB converter.
+   
+3. **Message Flow (Bidirectional)**:
+   - The message flow between the PC and STM32 via the CP2105 is **bidirectional**.
+   - A Python script running on the PC sends data to the CP2105 via one of its UART channels, and CP2105 forwards this data to the STM32 through the USB connection.
+   - Similarly, the STM32 can send data back to the PC through the CP2105's UART ports, enabling bidirectional communication.
+   - The STM32 prints out the received messages to the PC via ST-Link (USART3), which also serves as the debugging interface.
+
+Here's a simplified diagram of the bidirectional connection:
+```markdown
+PC (Python script) --> FTDI (UART-to-USB) --> CP2105 --> USB --> STM32 (USB Host) --> PC (ST-Link USART3 for debugging)
+```
+
+### USB Enumeration Process
+
+The USB enumeration process, handled by `usbh_core.c` in `Middlewares/ST/STM32_USB_Host_Library/Core/Src`, involves several key steps. Upon connecting the CP2105 to the STM32 (acting as USB Host), the STM32 resets the device, requests the device descriptor (containing Vendor ID, Product ID, and more), assigns a unique address, and retrieves the configuration descriptor. After setting the device configuration, the STM32 initializes the CP2105 class driver, enabling bidirectional data transfer between the host and device.
+
+## Deployment
 
 To integrate this driver into your STM32 project, follow the steps below:
 
@@ -55,10 +86,10 @@ if (Appli_state == APPLICATION_READY) {
 ```
 
 ### Testing Data Reception
-A Python script (`test_cp2105_receive.py`) is added to send data to CP2105 and verify that STM32 properly receives the data. ST-Link will transmit debugging messages (at 9600 baud) back to the PC for validation.
+Python script (`test_cp2105_receive.py`) is to send data to CP2105 and verify that STM32 properly receives the data. ST-Link will transmit debugging messages (at 9600 baud) back to the PC for validation.
 
 ### Testing Data Transmission
-To check if data is transmitted from the CP2105 to the PC, open a terminal (e.g., PuTTY) and monitor the COM port associated with the CP2105. Set the baud rate to match the one configured for the CP2105 in the STM32 code.
+To check if data is transmitted from the STM32 to the CP2105 via USB port, open a terminal (e.g., PuTTY) and monitor the COM port associated with the CP2105 (UART out). Set the baud rate to match the one configured for the CP2105 in the STM32 code.
 
 ## References
 This driver was developed with reference to the following resources:
