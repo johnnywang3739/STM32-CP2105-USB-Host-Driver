@@ -12,8 +12,7 @@ static USBH_StatusTypeDef SetBaudRate(USBH_HandleTypeDef *phost, uint32_t baudRa
 static USBH_StatusTypeDef GetBaudRate(USBH_HandleTypeDef *phost, uint32_t *baudRate, uint8_t port);
 static void CP2105_ProcessTransmission(USBH_HandleTypeDef *phost);
 static void CP2105_ProcessReception(USBH_HandleTypeDef *phost);
-//static bool data_received_flag = 0;
-//static bool data_trans
+
 USBH_ClassTypeDef CP2105_ClassDriver = {
   "CP2105",
   USB_CP2105_CLASS,
@@ -56,7 +55,7 @@ static USBH_StatusTypeDef USBH_CP2105_InterfaceInit(USBH_HandleTypeDef *phost) {
             for (uint8_t i = 0; i < phost->device.CfgDesc.Itf_Desc[interface].bNumEndpoints; i++) {
                 USBH_EpDescTypeDef *ep_desc = &phost->device.CfgDesc.Itf_Desc[interface].Ep_Desc[i];
 
-                if (interface == CP2105_STD_PORT) {
+                if (interface == CP2105_SCI_PORT) {
                     ep_desc->wMaxPacketSize = 32;
                 } else {
                     ep_desc->wMaxPacketSize = 64;
@@ -117,7 +116,7 @@ static USBH_StatusTypeDef USBH_CP2105_InterfaceDeInit(USBH_HandleTypeDef *phost)
 }
 static USBH_StatusTypeDef USBH_CP2105_EnableInterface(USBH_HandleTypeDef *phost, uint8_t interface) {
     phost->Control.setup.b.bmRequestType = 0x41; // Host to device, Class, Interface
-    phost->Control.setup.b.bRequest = 0x00; // IFC_ENABLE
+    phost->Control.setup.b.bRequest = IFC_ENABLE; // IFC_ENABLE
     phost->Control.setup.b.wValue.w = 0x0001; // Enable the interface
     phost->Control.setup.b.wIndex.w = interface;
     phost->Control.setup.b.wLength.w = 0;
@@ -131,7 +130,7 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
 
     switch (CP2105_Handle->state) {
         case CP2105_IDLE_STATE:
-            status = USBH_CP2105_EnableInterface(phost, CP2105_STD_PORT);
+            status = USBH_CP2105_EnableInterface(phost, CP2105_SCI_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_ENABLE_INTERFACE_STATE_PORT1;
                 status = USBH_BUSY;
@@ -142,7 +141,7 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
             break;
 
         case CP2105_ENABLE_INTERFACE_STATE_PORT1:
-            status = USBH_CP2105_EnableInterface(phost, CP2105_ENH_PORT);
+            status = USBH_CP2105_EnableInterface(phost, CP2105_ECI_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_ENABLE_INTERFACE_STATE_PORT2;
                 status = USBH_BUSY;
@@ -153,7 +152,7 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
             break;
 
         case CP2105_ENABLE_INTERFACE_STATE_PORT2:
-            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_STD_PORT], CP2105_STD_PORT);
+            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_SCI_PORT], CP2105_SCI_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT1;
                 status = USBH_BUSY;
@@ -164,7 +163,7 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
             break;
 
         case CP2105_GET_LINE_CODING_STATE_PORT1:
-            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_ENH_PORT], CP2105_ENH_PORT);
+            status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_ECI_PORT], CP2105_ECI_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT2;
                 status = USBH_BUSY;
@@ -175,7 +174,7 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
             break;
 
         case CP2105_GET_LINE_CODING_STATE_PORT2:
-            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_STD_PORT], CP2105_STD_PORT);
+            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_SCI_PORT], CP2105_SCI_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT1;
                 status = USBH_BUSY;
@@ -186,7 +185,7 @@ static USBH_StatusTypeDef USBH_CP2105_ClassRequest(USBH_HandleTypeDef *phost) {
             break;
 
         case CP2105_GET_BAUD_RATE_STATE_PORT1:
-            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_ENH_PORT], CP2105_ENH_PORT);
+            status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_ECI_PORT], CP2105_ECI_PORT);
             if (status == USBH_OK) {
                 CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT2;
                 status = USBH_BUSY;
@@ -221,7 +220,7 @@ static USBH_StatusTypeDef USBH_CP2105_Process(USBH_HandleTypeDef *phost)
             break;
 
         case CP2105_SET_LINE_CODING_STATE:
-            req_status = SetLineCoding(phost, CP2105_Handle->pUserLineCoding, CP2105_STD_PORT);
+            req_status = SetLineCoding(phost, CP2105_Handle->pUserLineCoding, CP2105_SCI_PORT);
             if (req_status == USBH_OK)
             {
                 CP2105_Handle->state = CP2105_GET_LAST_LINE_CODING_STATE;
@@ -236,7 +235,7 @@ static USBH_StatusTypeDef USBH_CP2105_Process(USBH_HandleTypeDef *phost)
             break;
 
         case CP2105_GET_LAST_LINE_CODING_STATE:
-            req_status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_STD_PORT], CP2105_STD_PORT);
+            req_status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_SCI_PORT], CP2105_SCI_PORT);
             if (req_status == USBH_OK)
             {
                 CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT1;
@@ -251,7 +250,7 @@ static USBH_StatusTypeDef USBH_CP2105_Process(USBH_HandleTypeDef *phost)
             break;
 
         case CP2105_GET_BAUD_RATE_STATE_PORT1:
-            req_status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_STD_PORT], CP2105_STD_PORT);
+            req_status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_SCI_PORT], CP2105_SCI_PORT);
             if (req_status == USBH_OK)
             {
                 CP2105_Handle->state = CP2105_GET_LINE_CODING_STATE_PORT2;
@@ -266,7 +265,7 @@ static USBH_StatusTypeDef USBH_CP2105_Process(USBH_HandleTypeDef *phost)
             break;
 
         case CP2105_GET_LINE_CODING_STATE_PORT2:
-            req_status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_ENH_PORT], CP2105_ENH_PORT);
+            req_status = GetLineCoding(phost, &CP2105_Handle->LineCoding[CP2105_ECI_PORT], CP2105_ECI_PORT);
             if (req_status == USBH_OK)
             {
                 CP2105_Handle->state = CP2105_GET_BAUD_RATE_STATE_PORT2;
@@ -281,12 +280,12 @@ static USBH_StatusTypeDef USBH_CP2105_Process(USBH_HandleTypeDef *phost)
             break;
 
         case CP2105_GET_BAUD_RATE_STATE_PORT2:
-            req_status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_ENH_PORT], CP2105_ENH_PORT);
+            req_status = GetBaudRate(phost, &CP2105_Handle->BaudRate[CP2105_ECI_PORT], CP2105_ECI_PORT);
             if (req_status == USBH_OK)
             {
                 CP2105_Handle->state = CP2105_IDLE_STATE;
-                USBH_CP2105_LineCodingChanged(phost, CP2105_STD_PORT);  // Notify user that line coding has changed
-                USBH_CP2105_LineCodingChanged(phost, CP2105_ENH_PORT);  // Notify user that line coding has changed
+                USBH_CP2105_LineCodingChanged(phost, CP2105_SCI_PORT);  
+                USBH_CP2105_LineCodingChanged(phost, CP2105_ECI_PORT);  
                 status = USBH_OK;
             }
             else
@@ -449,6 +448,7 @@ static void CP2105_ProcessReception(USBH_HandleTypeDef *phost) {
                     } else {
                         CP2105_Handle->RxDataLength[port] = 0U;
                         CP2105_Handle->Port[port].data_rx_state = CP2105_IDLE_STATE;
+                        CP2105_Handle->data_received_flag[port] = 1; // Set the flag
                         USBH_CP2105_ReceiveCallback(phost, port);
                     }
                 }
@@ -463,23 +463,24 @@ static void CP2105_ProcessReception(USBH_HandleTypeDef *phost) {
 
 
 void USBH_CP2105_LineCodingChanged(USBH_HandleTypeDef *phost, uint8_t port) {
-  /* This function should be implemented in the user file to process the changes */
+    // user of this code and implement their own callback function based on their needs
 }
 
-void USBH_CP2105_TransmitCallback(USBH_HandleTypeDef *phost, uint8_t port) {
-  /* This function should be implemented in the user file to process the data transmission completion */
+void USBH_CP2105_TransmitCallback(USBH_HandleTypeDef *phost, uint8_t port) {  
+
+    // user of this code and implement their own callback function based on their needs
 }
 
 void USBH_CP2105_ReceiveCallback(USBH_HandleTypeDef *phost, uint8_t port) {
 //	data_received_flag = 1;
-  /* This function should be implemented in the user file to process the data reception completion */
+    // user of this code and implement their own callback function based on their needs
 }
 
 USBH_StatusTypeDef USBH_CP2105_SetBaudRate(USBH_HandleTypeDef *phost, uint32_t baudRate, uint8_t port) {
     CP2105_HandleTypeDef *CP2105_Handle = (CP2105_HandleTypeDef *)phost->pActiveClass->pData;
     USBH_StatusTypeDef status = SetBaudRate(phost, baudRate, port);
     if (status == USBH_OK) {
-        CP2105_Handle->BaudRate[port] = baudRate; // Store the baud rate in the handle
+        CP2105_Handle->BaudRate[port] = baudRate; 
     }
     return status;
 }

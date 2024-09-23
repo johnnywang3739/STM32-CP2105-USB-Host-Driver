@@ -4,7 +4,7 @@ import time
 # to send from USB Serial Port (COM13)
 ser = serial.Serial(
     port='COM13',             # Send data from CP2105 UART (USB Serial Port) to STM32 (COM13)
-    baudrate=2000000,          # Baud rate
+    baudrate=9600,          # Baud rate
     parity=serial.PARITY_NONE, # No parity
     stopbits=serial.STOPBITS_ONE, # One stop bit
     bytesize=serial.EIGHTBITS, # Eight data bits
@@ -24,13 +24,15 @@ def send_data(data):
 data_to_send = "from STM32 ST-link"
 
 counter = 1
+# message = f"{counter} {data_to_send}"
+# send_data(message)
 while True:
     message = f"{counter} {data_to_send}"
     send_data(message)
     counter += 1
     if counter > 1000:
         counter = 1
-    time.sleep(1)
+    time.sleep(3)
 
 # Close the serial port
 ser.close()

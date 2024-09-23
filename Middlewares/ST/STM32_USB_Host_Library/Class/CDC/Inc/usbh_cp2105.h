@@ -19,11 +19,13 @@ extern "C" {
 #define CP210x_SET_BAUDRATE                  0x1EU
 
 #define CP2105_SET_CONTROL_LINE_STATE        0x22U
+#define IFC_ENABLE                           0x00U
 
 /* Port Indexes */
-#define CP2105_STD_PORT                      1U
-#define CP2105_ENH_PORT                      0U
-
+// #define CP2105_STD_PORT                      1U
+// #define CP2105_ENH_PORT                      0U
+#define CP2105_SCI_PORT                      1U
+#define CP2105_ECI_PORT                      0U
 /* States */
 typedef enum {
     CP2105_IDLE_STATE = 0,
@@ -71,14 +73,16 @@ typedef struct {
 typedef struct {
   uint8_t state;
   CP2105_LineCodingTypeDef LineCoding[2];
-  uint32_t BaudRate[2];  
+  uint32_t BaudRate[2];
   CP2105_LineCodingTypeDef *pUserLineCoding;
   uint8_t *pTxData[2];
   uint8_t *pRxData[2];
   uint32_t TxDataLength[2];
   uint32_t RxDataLength[2];
   CP2105_PortTypeDef Port[2];
+  uint8_t data_received_flag[2]; // Add this line
 } CP2105_HandleTypeDef;
+
 
 extern USBH_ClassTypeDef CP2105_ClassDriver;
 
