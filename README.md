@@ -91,6 +91,18 @@ Python script (`test_cp2105_receive.py`) is to send data to CP2105 and verify th
 ### Testing Data Transmission
 To check if data is transmitted from the STM32 to the CP2105 via USB port, open a terminal (e.g., PuTTY) and monitor the COM port associated with the CP2105 (UART out). Set the baud rate to match the one configured for the CP2105 in the STM32 code.
 
+### FreeRTOS Task Setup
+
+In the FreeRTOS branch, the USB communication and processing are divided into separate tasks to efficiently manage the USB and UART communication flow:
+
+- **USBProcessTask**: Handles USB enumeration and communication with the CP2105. This task has the highest priority and continuously processes USB events, ensuring the STM32 communicates properly with the CP2105 device.
+  
+- **TransmitTask**: Manages sending data from the STM32 to the CP2105. This task verifies that the application is ready and sends data over the selected UART port of the CP2105.
+
+- **ReceiveTask**: Handles receiving data from the CP2105 to the STM32. This task ensures proper mutex handling to prevent data conflicts and processes the incoming data.
+
+Each task operates in a multitasking environment using FreeRTOS, allowing USB processing, data transmission, and reception to occur concurrently without blocking one another.
+
 ## References
 This driver was developed with reference to the following resources:
 
